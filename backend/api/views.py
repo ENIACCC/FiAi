@@ -4,11 +4,42 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
-from .models import Watchlist
+from .models import Watchlist, AIAnalysisLog, UserProfile
+from .serializers import AIAnalysisLogSerializer, UserSerializer, ChangePasswordSerializer
+from rest_framework import viewsets, generics, status
 import random
 import datetime
 import akshare as ak
 import pandas as pd
+
+class UserInfoView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserSerializer
+
+    def get_object(self):
+        # Ensure profile exists
+        if not hasattr(self.request.user, 'profile'):
+            UserProfile.objects.create(user=self.request.user)
+        return self.request.user
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            user = request.user
+            if user.check_password(serializer.data.get('old_password')):
+                user.set_password(serializer.data.get('new_password'))
+                user.save()
+                return Response({'status': 'success', 'message': 'Password updated successfully'})
+            return Response({'status': 'error', 'message': 'Incorrect old password'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class AIAnalysisLogViewSet(viewsets.ModelViewSet):
+    queryset = AIAnalysisLog.objects.all()
+    serializer_class = AIAnalysisLogSerializer
+    permission_classes = [AllowAny]
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
@@ -187,6 +218,8 @@ class WatchlistView(APIView):
         return Response({"status": "success", "message": "Removed from watchlist"})
 
 class AIAnalyzeView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         # Mock AI Analysis
         # Receives a list of stocks or uses the watchlist
@@ -194,6 +227,11 @@ class AIAnalyzeView(APIView):
         if not watchlist:
             return Response({"status": "info", "message": "自选股为空，请先添加股票。"})
         
+        # Get user preferred model
+        ai_model = 'DeepSeek-V3'
+        if hasattr(request.user, 'profile') and request.user.profile.ai_model:
+            ai_model = request.user.profile.ai_model
+
         analysis_results = []
         for stock in watchlist:
             # Mock analysis logic
@@ -210,13 +248,26 @@ class AIAnalyzeView(APIView):
                 "action": "买入" if sentiment == "看涨" else ("卖出" if sentiment == "看跌" else "持有")
             })
             
-        ai_response = f"我对您当前的自选股组合进行了深度分析。\n\n"
+        ai_response = f"我对您当前的自选股组合进行了深度分析（基于模型: {ai_model}）。\n\n"
         for item in analysis_results:
             ai_response += f"**{item['name']} ({item['ts_code']})**\n"
             ai_response += f"- 建议：{item['action']} (置信度: {item['score']}%)\n"
             ai_response += f"- 分析：{item['reason']}\n\n"
             
         ai_response += "*(注：以上分析由AI生成，仅供参考，不构成投资建议)*"
+
+        # Save to DB
+        try:
+            # We can save a summary log or individual logs per stock
+            # Here we save a summary log for simplicity, or we could save individual ones.
+            # Let's save a "Portfolio Analysis" log entry.
+            AIAnalysisLog.objects.create(
+                ts_code="PORTFOLIO",
+                stock_name="自选股组合",
+                analysis_content=ai_response
+            )
+        except Exception as e:
+            print(f"Failed to save AI log: {e}")
 
         return Response({
             "status": "success",

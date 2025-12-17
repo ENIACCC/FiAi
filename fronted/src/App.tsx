@@ -1,12 +1,13 @@
 import { ConfigProvider, theme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { useStore } from './store/useStore';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
 import { StockPage } from './pages/StockPage';
-import { WatchlistPage } from './pages/WatchlistPage';
+import { AnalysisHistory } from './pages/AnalysisHistory';
+import { Settings } from './pages/Settings';
 
 const AuthGuard = ({ children }: { children: JSX.Element }) => {
   // const token = useStore((state) => state.token);
@@ -46,12 +47,12 @@ function App() {
           {/* Placeholders for other routes */}
           <Route path="/analysis" element={
             <AuthGuard>
-              <Dashboard /> {/* Placeholder */}
+              <AnalysisHistory />
             </AuthGuard>
           } />
            <Route path="/settings" element={
             <AuthGuard>
-              <Dashboard /> {/* Placeholder */}
+              <Settings />
             </AuthGuard>
           } />
         </Routes>
