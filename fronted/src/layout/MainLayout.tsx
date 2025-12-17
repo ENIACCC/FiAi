@@ -1,13 +1,14 @@
-import { Layout, Menu, Button, Drawer, theme, Grid } from 'antd';
+import { Layout, Menu, Button, Drawer, theme, Grid, Dropdown, Avatar } from 'antd';
 import { 
   MenuOutlined, DashboardOutlined, StockOutlined, 
   ThunderboltOutlined, SettingOutlined, MessageOutlined,
-  SunOutlined, MoonOutlined, StarOutlined
+  SunOutlined, MoonOutlined, LogoutOutlined, UserOutlined
 } from '@ant-design/icons';
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { AIChat } from '../components/AIChat';
 import { useNavigate, useLocation } from 'react-router-dom';
+import type { MenuProps } from 'antd';
 
 const { Header, Sider, Content } = Layout;
 const { useBreakpoint } = Grid;
@@ -19,7 +20,7 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const [collapsed, setCollapsed] = useState(true);
   const [aiOpen, setAiOpen] = useState(false);
   const [pcAiCollapsed, setPcAiCollapsed] = useState(true); // Default to collapsed (closed)
-  const { isDark, toggleTheme } = useStore();
+  const { isDark, toggleTheme, logout, username } = useStore();
   const { token } = theme.useToken();
   const navigate = useNavigate();
   const location = useLocation();
@@ -35,6 +36,29 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
     navigate(key);
     setMenuOpen(false);
   };
+  
+  const handleLogout = () => {
+      logout();
+      navigate('/login');
+  };
+
+  const userMenu: MenuProps['items'] = [
+    {
+      key: 'settings',
+      label: '设置',
+      icon: <SettingOutlined />,
+      onClick: () => navigate('/settings'),
+    },
+    {
+      type: 'divider',
+    },
+    {
+      key: 'logout',
+      label: '退出登录',
+      icon: <LogoutOutlined />,
+      onClick: handleLogout,
+    },
+  ];
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -57,8 +81,16 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
           <div style={{ fontSize: 20, fontWeight: 'bold', color: token.colorPrimary }}>Trae 金融</div>
         </div>
         
-        <div style={{ display: 'flex', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <Button shape="circle" icon={isDark ? <SunOutlined /> : <MoonOutlined />} onClick={toggleTheme} />
+          
+          <Dropdown menu={{ items: userMenu }} placement="bottomRight">
+            <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Avatar icon={<UserOutlined />} style={{ backgroundColor: token.colorPrimary }} />
+              {!isMobile && <span>{username || 'User'}</span>}
+            </div>
+          </Dropdown>
+
           {isMobile && (
             <Button shape="circle" icon={<MessageOutlined />} onClick={() => setAiOpen(true)} type="primary" ghost />
           )}

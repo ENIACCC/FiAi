@@ -14,7 +14,7 @@ api.interceptors.request.use((config) => {
 
 export const login = (data: any) => api.post('token/', data);
 export const register = (data: any) => api.post('register/', data);
-export const getStocks = () => api.get('stock/');
+export const getStocks = (q?: string) => api.get('stock/', { params: { q } });
 export const getMarketIndex = () => api.get('market/index/');
 export const getTopGainers = () => api.get('market/top-gainers/');
 export const getWatchlist = () => api.get('watchlist/');

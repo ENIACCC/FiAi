@@ -4,7 +4,7 @@ import { Card, Table, Typography, Tag, Space, Button } from 'antd';
 import { ThunderboltOutlined, ReloadOutlined } from '@ant-design/icons';
 import axios from 'axios';
 
-const { Title, Paragraph } = Typography;
+const { Paragraph } = Typography;
 
 interface AnalysisLog {
   id: number;
@@ -74,17 +74,21 @@ export const AnalysisHistory = () => {
 
   return (
     <MainLayout>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <Title level={2} style={{ margin: 0 }}>
-          <ThunderboltOutlined style={{ marginRight: 12 }} />
-          AI 分析历史
-        </Title>
-        <Button icon={<ReloadOutlined />} onClick={fetchData} loading={loading}>
-          刷新
-        </Button>
-      </div>
-
-      <Card bordered={false} className="shadow-sm">
+      <Card 
+        variant="borderless"
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <ThunderboltOutlined />
+            <span>AI 分析历史</span>
+          </div>
+        }
+        extra={
+          <Button icon={<ReloadOutlined />} onClick={fetchData} loading={loading}>
+            刷新
+          </Button>
+        }
+        className="shadow-sm"
+      >
         <Table 
           columns={columns} 
           dataSource={data} 

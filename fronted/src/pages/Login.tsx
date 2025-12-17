@@ -1,4 +1,4 @@
-import { Form, Input, Button, Card, message } from 'antd';
+import { Form, Input, Button, Card, App } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 import { useStore } from '../store/useStore';
@@ -9,12 +9,13 @@ export const Login = () => {
   const navigate = useNavigate();
   const setAuth = useStore((state) => state.setAuth);
   const [loading, setLoading] = useState(false);
+  const { message } = App.useApp();
 
   const onFinish = async (values: any) => {
     setLoading(true);
     try {
       const res = await api.login(values);
-      setAuth(res.data.access, values.username);
+      setAuth(res.data.access, res.data.refresh, values.username);
       message.success('登录成功');
       navigate('/');
     } catch (error) {
@@ -27,7 +28,7 @@ export const Login = () => {
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f0f2f5' }}>
-      <Card title="Trae 金融 - 登录" style={{ width: 350 }}>
+      <Card title="Trae 金融 - 登录" style={{ width: 350 }} variant="outlined">
         <Form onFinish={onFinish}>
           <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
             <Input prefix={<UserOutlined />} placeholder="用户名" />

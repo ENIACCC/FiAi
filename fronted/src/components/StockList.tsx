@@ -4,9 +4,8 @@ import { useState, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import * as api from '../api';
 
-export const StockList = ({ data, loading }: { data: any[]; loading: boolean }) => {
+export const StockList = ({ data, loading, onSearch }: { data: any[]; loading: boolean; onSearch: (val: string) => void }) => {
   const { watchlist, addToWatchlist, removeFromWatchlist } = useStore();
-  const [searchText, setSearchText] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'watchlist'>('all');
 
   const handleToggleWatchlist = async (record: any) => {
@@ -26,13 +25,18 @@ export const StockList = ({ data, loading }: { data: any[]; loading: boolean }) 
     }
   };
 
+  // We rely on backend search now for 'all' mode with searchText
+  // But for 'watchlist' mode, we might still want to filter locally? 
+  // Or just display watchlist.
+  
   const filteredData = useMemo(() => {
-    return data.filter(item => {
-      const matchSearch = item.name.includes(searchText) || item.ts_code.includes(searchText);
-      const matchWatchlist = filterMode === 'watchlist' ? watchlist.has(item.ts_code) : true;
-      return matchSearch && matchWatchlist;
-    });
-  }, [data, searchText, filterMode, watchlist]);
+    // If we have data from backend (which is already filtered by search if onSearch called),
+    // we just need to filter by watchlist if mode is watchlist.
+    if (filterMode === 'watchlist') {
+        return data.filter(item => watchlist.has(item.ts_code));
+    }
+    return data;
+  }, [data, filterMode, watchlist]);
 
   const columns = [
     { title: '代码', dataIndex: 'ts_code', width: 100, render: (text: string) => <Tag>{text}</Tag> },
@@ -42,9 +46,18 @@ export const StockList = ({ data, loading }: { data: any[]; loading: boolean }) 
         {watchlist.has(record.ts_code) && <StarFilled style={{ color: '#faad14' }} />}
       </Space>
     )},
-    { title: '行业', dataIndex: 'industry', width: 100 },
-    { title: '地区', dataIndex: 'area', width: 80 },
-    { title: '上市日期', dataIndex: 'list_date', width: 120 },
+    { title: '最新价', dataIndex: 'price', width: 100, render: (val: number, record: any) => (
+        <span style={{ color: record.change_pct > 0 ? '#ff4d4f' : record.change_pct < 0 ? '#52c41a' : 'inherit' }}>
+            {val}
+        </span>
+    )},
+    { title: '涨跌幅%', dataIndex: 'change_pct', width: 100, render: (val: number) => (
+        <span style={{ color: val > 0 ? '#ff4d4f' : val < 0 ? '#52c41a' : 'inherit' }}>
+            {val > 0 ? '+' : ''}{val}%
+        </span>
+    )},
+    { title: '换手率%', dataIndex: 'turnover_rate', width: 100, render: (val: number) => val ? `${val}%` : '-' },
+    { title: '市盈率', dataIndex: 'pe', width: 100, render: (val: number) => val ? val.toFixed(2) : '-' },
     {
       title: '操作',
       key: 'action',
@@ -79,8 +92,8 @@ export const StockList = ({ data, loading }: { data: any[]; loading: boolean }) 
           placeholder="搜索股票代码/名称" 
           allowClear
           style={{ width: 260 }} 
-          onSearch={val => setSearchText(val)}
-          onChange={e => setSearchText(e.target.value)}
+          onSearch={val => onSearch(val)}
+          // Trigger search on enter or clear
         />
       </div>
 

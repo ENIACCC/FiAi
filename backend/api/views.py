@@ -7,6 +7,7 @@ from django.contrib.auth.hashers import make_password
 from .models import Watchlist, AIAnalysisLog, UserProfile
 from .serializers import AIAnalysisLogSerializer, UserSerializer, ChangePasswordSerializer
 from rest_framework import viewsets, generics, status
+from rest_framework_simplejwt.tokens import RefreshToken
 import random
 import datetime
 import akshare as ak
@@ -18,11 +19,15 @@ class UserInfoView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         # Ensure profile exists
-        if not hasattr(self.request.user, 'profile'):
-            UserProfile.objects.create(user=self.request.user)
+        UserProfile.objects.get_or_create(user_id=self.request.user.id)
         return self.request.user
 
-class ChangePasswordView(APIView):
+    def update(self, request, *args, **kwargs):
+        # Allow partial update
+        kwargs['partial'] = True
+        return super().update(request, *args, **kwargs)
+
+class ChangePasswordView(generics.UpdateAPIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -51,14 +56,32 @@ class RegisterView(APIView):
         if not username or not password:
             return Response({"status": "error", "message": "Username and password are required"}, status=400)
         
+        # Password strength validation
+        if len(password) < 6:
+            return Response({"status": "error", "message": "密码长度不能少于6位"}, status=400)
+        if not any(char.isdigit() for char in password) or not any(char.isalpha() for char in password):
+            return Response({"status": "error", "message": "密码需包含字母和数字"}, status=400)
+
         if User.objects.filter(username=username).exists():
             return Response({"status": "error", "message": "Username already exists"}, status=400)
         
-        user = User.objects.create(
-            username=username,
-            password=make_password(password)
-        )
-        return Response({"status": "success", "message": "User created successfully"})
+        try:
+            user = User.objects.create(
+                username=username,
+                password=make_password(password)
+            )
+            
+            # Create token for auto login
+            refresh = RefreshToken.for_user(user)
+            
+            return Response({
+                "status": "success", 
+                "message": "User created successfully",
+                "access": str(refresh.access_token),
+                "refresh": str(refresh)
+            })
+        except Exception as e:
+            return Response({"status": "error", "message": str(e)}, status=500)
 
 class MarketIndexView(APIView):
     def get(self, request):
@@ -153,21 +176,60 @@ class TopGainersView(APIView):
             })
 
 class StockDataView(APIView):
+    permission_classes = [IsAuthenticated]
+    
     def get(self, request):
         try:
             # Get list of stocks
             # stock_zh_a_spot_em returns all stocks with current data
-            df = ak.stock_zh_a_spot_em()
+            df_stocks = ak.stock_zh_a_spot_em()
             
-            # Select top 200 to avoid performance issues
-            df_subset = df.head(200)
+            # Get list of ETFs
+            try:
+                df_etfs = ak.fund_etf_spot_em()
+            except:
+                df_etfs = pd.DataFrame()
+
+            # Prepare columns
+            stock_cols = ['代码', '名称', '最新价', '涨跌幅', '成交量', '换手率', '市盈率-动态', '总市值']
+            etf_cols = ['代码', '名称', '最新价', '涨跌幅', '成交量', '换手率', '总市值']
+            
+            # Normalize Stock DF
+            df_s = df_stocks[stock_cols].copy()
+            df_s.rename(columns={'市盈率-动态': 'pe'}, inplace=True)
+            
+            # Normalize ETF DF
+            if not df_etfs.empty:
+                # Ensure columns exist (sometimes API changes)
+                available_etf_cols = [c for c in etf_cols if c in df_etfs.columns]
+                df_e = df_etfs[available_etf_cols].copy()
+                df_e['pe'] = None
+                df = pd.concat([df_s, df_e], ignore_index=True)
+            else:
+                df = df_s
+
+            # Filter by query if present
+            query = request.query_params.get('q', '')
+            if query:
+                # Filter by code or name
+                # Ensure columns are string
+                df['代码'] = df['代码'].astype(str)
+                df['名称'] = df['名称'].astype(str)
+                df = df[df['代码'].str.contains(query, case=False) | df['名称'].str.contains(query, case=False)]
+            
+            # Return all stocks so frontend can filter/search locally or display full list
+            # The payload is roughly 1-2MB which is acceptable for modern networks
+            df_subset = df
+            
+            # Replace NaN with None for valid JSON serialization
+            df_subset = df_subset.where(pd.notnull(df_subset), None)
             
             records = []
             for _, row in df_subset.iterrows():
                 raw_code = str(row['代码'])
-                if raw_code.startswith('6'):
+                if raw_code.startswith('6') or raw_code.startswith('9') or raw_code.startswith('5'):
                     ts_code = f"{raw_code}.SH"
-                elif raw_code.startswith('0') or raw_code.startswith('3'):
+                elif raw_code.startswith('0') or raw_code.startswith('2') or raw_code.startswith('3') or raw_code.startswith('1'):
                     ts_code = f"{raw_code}.SZ"
                 elif raw_code.startswith('8') or raw_code.startswith('4'):
                     ts_code = f"{raw_code}.BJ"
@@ -178,9 +240,12 @@ class StockDataView(APIView):
                     "ts_code": ts_code,
                     "symbol": raw_code,
                     "name": row['名称'],
-                    "area": "", # Akshare spot API doesn't have area/industry easily in this call, leave blank or fetch elsewhere if critical
-                    "industry": "",
-                    "list_date": ""
+                    "price": row['最新价'],
+                    "change_pct": row['涨跌幅'],
+                    "volume": row['成交量'],
+                    "turnover_rate": row['换手率'],
+                    "pe": row.get('pe'), # Use .get for safety
+                    "market_cap": row['总市值']
                 })
             
             return Response({"status": "success", "data": records})
@@ -194,8 +259,10 @@ class StockDataView(APIView):
             })
 
 class WatchlistView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
-        watchlist = Watchlist.objects.all().values()
+        watchlist = Watchlist.objects.filter(user_id=request.user.id).values()
         return Response({"status": "success", "data": list(watchlist)})
 
     def post(self, request):
@@ -204,7 +271,11 @@ class WatchlistView(APIView):
         if not ts_code or not name:
             return Response({"status": "error", "message": "Missing ts_code or name"}, status=400)
         
-        obj, created = Watchlist.objects.get_or_create(ts_code=ts_code, defaults={'name': name})
+        obj, created = Watchlist.objects.get_or_create(
+            ts_code=ts_code, 
+            user_id=request.user.id,
+            defaults={'name': name}
+        )
         if not created:
              return Response({"status": "info", "message": "Already in watchlist"})
         return Response({"status": "success", "message": "Added to watchlist"})
@@ -214,7 +285,7 @@ class WatchlistView(APIView):
         if not ts_code:
             return Response({"status": "error", "message": "Missing ts_code"}, status=400)
         
-        Watchlist.objects.filter(ts_code=ts_code).delete()
+        Watchlist.objects.filter(ts_code=ts_code, user_id=request.user.id).delete()
         return Response({"status": "success", "message": "Removed from watchlist"})
 
 class AIAnalyzeView(APIView):
@@ -223,14 +294,16 @@ class AIAnalyzeView(APIView):
     def post(self, request):
         # Mock AI Analysis
         # Receives a list of stocks or uses the watchlist
-        watchlist = Watchlist.objects.all()
+        watchlist = Watchlist.objects.filter(user_id=request.user.id)
         if not watchlist:
             return Response({"status": "info", "message": "自选股为空，请先添加股票。"})
         
         # Get user preferred model
         ai_model = 'DeepSeek-V3'
-        if hasattr(request.user, 'profile') and request.user.profile.ai_model:
-            ai_model = request.user.profile.ai_model
+        # Manual lookup since relation is gone
+        profile = UserProfile.objects.filter(user_id=request.user.id).first()
+        if profile and profile.ai_model:
+            ai_model = profile.ai_model
 
         analysis_results = []
         for stock in watchlist:

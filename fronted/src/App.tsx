@@ -1,7 +1,7 @@
-import { ConfigProvider, theme } from 'antd';
+import { ConfigProvider, theme, App as AntdApp } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { useStore } from './store/useStore';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
@@ -10,10 +10,10 @@ import { AnalysisHistory } from './pages/AnalysisHistory';
 import { Settings } from './pages/Settings';
 
 const AuthGuard = ({ children }: { children: JSX.Element }) => {
-  // const token = useStore((state) => state.token);
-  // if (!token) {
-  //   return <Navigate to="/login" replace />;
-  // }
+  const token = useStore((state) => state.token);
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
   return children;
 };
 
@@ -30,33 +30,35 @@ function App() {
         },
       }}
     >
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/" element={
-            <AuthGuard>
-              <Dashboard />
-            </AuthGuard>
-          } />
-          <Route path="/stocks" element={
-            <AuthGuard>
-              <StockPage />
-            </AuthGuard>
-          } />
-          {/* Placeholders for other routes */}
-          <Route path="/analysis" element={
-            <AuthGuard>
-              <AnalysisHistory />
-            </AuthGuard>
-          } />
-           <Route path="/settings" element={
-            <AuthGuard>
-              <Settings />
-            </AuthGuard>
-          } />
-        </Routes>
-      </BrowserRouter>
+      <AntdApp>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/" element={
+              <AuthGuard>
+                <Dashboard />
+              </AuthGuard>
+            } />
+            <Route path="/stocks" element={
+              <AuthGuard>
+                <StockPage />
+              </AuthGuard>
+            } />
+            {/* Placeholders for other routes */}
+            <Route path="/analysis" element={
+              <AuthGuard>
+                <AnalysisHistory />
+              </AuthGuard>
+            } />
+             <Route path="/settings" element={
+              <AuthGuard>
+                <Settings />
+              </AuthGuard>
+            } />
+          </Routes>
+        </BrowserRouter>
+      </AntdApp>
     </ConfigProvider>
   )
 }

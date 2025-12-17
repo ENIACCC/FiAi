@@ -1,19 +1,32 @@
-import { Form, Input, Button, Card, message } from 'antd';
+import { Form, Input, Button, Card, App } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 import * as api from '../api';
 import { useState } from 'react';
+import { useStore } from '../store/useStore';
 
 export const Register = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const { message } = App.useApp();
+  const { setAuth } = useStore();
 
   const onFinish = async (values: any) => {
     setLoading(true);
     try {
-      await api.register(values);
-      message.success('注册成功，请登录');
-      navigate('/login');
+      const res = await api.register(values);
+      console.log('Register response:', res); // Debug log
+
+      if (res.data.status === 'success' && res.data.access) {
+        message.success('注册成功，已自动登录');
+        setAuth(res.data.access, res.data.refresh, values.username);
+        // Delay navigation slightly to ensure state update? 
+        // Usually not needed, but let's try strict ordering.
+        setTimeout(() => navigate('/'), 0);
+      } else {
+        message.success('注册成功，请登录');
+        navigate('/login');
+      }
     } catch (error) {
       message.error('注册失败，用户名可能已存在');
       console.error(error);
@@ -24,13 +37,20 @@ export const Register = () => {
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f0f2f5' }}>
-      <Card title="Trae 金融 - 注册" style={{ width: 350 }}>
+      <Card title="Trae 金融 - 注册" style={{ width: 350 }} variant="outlined">
         <Form onFinish={onFinish}>
           <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
             <Input prefix={<UserOutlined />} placeholder="用户名" />
           </Form.Item>
-          <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
-            <Input.Password prefix={<LockOutlined />} placeholder="密码" />
+          <Form.Item 
+            name="password" 
+            rules={[
+              { required: true, message: '请输入密码' },
+              { min: 6, message: '密码长度不能少于6位' },
+              { pattern: /^(?=.*[a-zA-Z])(?=.*\d).+$/, message: '密码需包含字母和数字' }
+            ]}
+          >
+            <Input.Password prefix={<LockOutlined />} placeholder="密码 (至少6位，包含字母数字)" />
           </Form.Item>
           <Form.Item 
             name="confirm" 

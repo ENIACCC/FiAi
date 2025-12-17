@@ -2,33 +2,44 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+import uuid
 
 class UserProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user_id = models.IntegerField(unique=True, verbose_name="用户ID")
     ai_api_key = models.CharField(max_length=255, blank=True, null=True, verbose_name="AI API Key")
     ai_model = models.CharField(max_length=50, blank=True, null=True, default='deepseek-chat', verbose_name="AI Model")
 
     def __str__(self):
-        return f"{self.user.username}'s Profile"
+        return f"User({self.user_id}) Profile"
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
-        UserProfile.objects.create(user=instance)
+        UserProfile.objects.create(user_id=instance.id)
 
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
-    instance.profile.save()
+    # No direct relationship anymore, so we might not need this if we don't update profile via user save
+    # But if we did, we'd do:
+    # UserProfile.objects.filter(user_id=instance.id).update(...)
+    pass
 
 class Watchlist(models.Model):
-    ts_code = models.CharField(max_length=20, unique=True)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user_id = models.IntegerField(verbose_name="用户ID")
+    ts_code = models.CharField(max_length=20)
     name = models.CharField(max_length=100)
     added_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        unique_together = ('user_id', 'ts_code')
+
     def __str__(self):
-        return f"{self.name} ({self.ts_code})"
+        return f"{self.name} ({self.ts_code}) - User:{self.user_id}"
 
 class AIAnalysisLog(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     ts_code = models.CharField(max_length=20, verbose_name="股票代码")
     stock_name = models.CharField(max_length=100, verbose_name="股票名称", blank=True, null=True)
     analysis_content = models.TextField(verbose_name="分析内容")

@@ -185,12 +185,9 @@ export const Settings = () => {
 
   return (
     <MainLayout>
-      <div style={{ maxWidth: 800, margin: '0 auto' }}>
-        <Title level={2} style={{ marginBottom: 24 }}>账户设置</Title>
-        <Card bordered={false} className="shadow-sm">
-          <Tabs defaultActiveKey="1" items={items} />
-        </Card>
-      </div>
+      <Card title="账户设置" variant="borderless">
+        <Tabs defaultActiveKey="1" items={items} />
+      </Card>
     </MainLayout>
   );
 };

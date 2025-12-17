@@ -1,0 +1,8 @@
+Django==5.0.6
+djangorestframework
+django-cors-headers
+akshare
+pandas
+requests
+djangorestframework-simplejwt
+psycopg2-binary

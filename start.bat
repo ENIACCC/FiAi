@@ -1,17 +1,43 @@
 @echo off
-echo ==========================================
-echo       FiAi Project Launcher
-echo ==========================================
+setlocal
 
-echo [1/2] Starting Django Backend...
-start "FiAi Backend" cmd /k "cd backend && python manage.py runserver"
+title FiAi Project Launcher
+echo ========================================================
+echo                  Starting FiAi Project
+echo ========================================================
+echo.
 
-echo [2/2] Starting Frontend...
-start "FiAi Frontend" cmd /k "cd fronted && npm run dev"
+:: Check directories
+if not exist "backend" (
+    echo [ERROR] 'backend' directory not found!
+    pause
+    exit /b 1
+)
+if not exist "fronted" (
+    echo [ERROR] 'fronted' directory not found!
+    pause
+    exit /b 1
+)
 
-echo ==========================================
-echo    Services are starting in new windows
-echo    Backend: http://127.0.0.1:8000
-echo    Frontend: http://localhost:5173
-echo ==========================================
+:: 1. Start Backend
+echo [1/2] Launching Backend Server (Django)...
+cd backend
+start "FiAi Backend Server" cmd /k "echo Starting Django... && python manage.py runserver 0.0.0.0:8000"
+cd ..
+
+:: 2. Start Frontend
+echo [2/2] Launching Frontend Server (Vite)...
+cd fronted
+start "FiAi Frontend Server" cmd /k "echo Starting Vite... && npm run dev"
+cd ..
+
+echo.
+echo ========================================================
+echo                 Services Launching...
+echo.
+echo    - Backend API: http://localhost:8000
+echo    - Frontend UI: http://localhost:5173
+echo.
+echo    Please do not close the popped-up command windows.
+echo ========================================================
 pause

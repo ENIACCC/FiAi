@@ -13,12 +13,16 @@ class UserProfileSerializer(serializers.ModelSerializer):
         fields = ['ai_api_key', 'ai_model']
 
 class UserSerializer(serializers.ModelSerializer):
-    profile = UserProfileSerializer(required=False)
+    profile = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ['id', 'username', 'first_name', 'last_name', 'email', 'profile']
         read_only_fields = ['username']
+
+    def get_profile(self, obj):
+        profile, _ = UserProfile.objects.get_or_create(user_id=obj.id)
+        return UserProfileSerializer(profile).data
 
     def update(self, instance, validated_data):
         profile_data = validated_data.pop('profile', None)
@@ -30,11 +34,7 @@ class UserSerializer(serializers.ModelSerializer):
 
         # Update Profile fields
         if profile_data:
-            # Ensure profile exists (it should via signal, but safety first)
-            if not hasattr(instance, 'profile'):
-                UserProfile.objects.create(user=instance)
-            
-            profile = instance.profile
+            profile, _ = UserProfile.objects.get_or_create(user_id=instance.id)
             for attr, value in profile_data.items():
                 setattr(profile, attr, value)
             profile.save()

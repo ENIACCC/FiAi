@@ -7,26 +7,42 @@ export const useStockData = () => {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
+  const fetchData = async (query?: string) => {
+    setLoading(true);
+    try {
+      // Use allSettled or separate try-catch to avoid one failure blocking others
+      // Actually, we want stocks even if watchlist fails
+      const stockRes = await api.getStocks(query);
+      
+      let watchlistData: string[] = [];
       try {
-        const [stockRes, watchRes] = await Promise.all([
-          api.getStocks(),
-          api.getWatchlist()
-        ]);
-        setData(stockRes.data.data);
+        const watchRes = await api.getWatchlist();
         if (watchRes.data.status === 'success') {
-          setWatchlist(watchRes.data.data.map((item: any) => item.ts_code));
+           watchlistData = watchRes.data.data.map((item: any) => item.ts_code);
         }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
+      } catch (e) {
+        console.warn('Failed to fetch watchlist:', e);
+        // Ignore watchlist error (e.g. 401)
       }
-    };
+
+      setData(stockRes.data.data);
+      if (watchlistData.length > 0) {
+        setWatchlist(watchlistData);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, [setWatchlist]);
 
-  return { data, loading };
+  const search = (query: string) => {
+    fetchData(query);
+  };
+
+  return { data, loading, search };
 };

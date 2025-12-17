@@ -8,8 +8,9 @@ interface AppState {
   removeFromWatchlist: (code: string) => void;
   setWatchlist: (codes: string[]) => void;
   token: string | null;
+  refreshToken: string | null;
   username: string | null;
-  setAuth: (token: string, username: string) => void;
+  setAuth: (token: string, refreshToken: string, username: string) => void;
   logout: () => void;
 }
 
@@ -29,15 +30,18 @@ export const useStore = create<AppState>((set) => ({
   }),
   setWatchlist: (codes) => set({ watchlist: new Set(codes) }),
   token: localStorage.getItem('token'),
+  refreshToken: localStorage.getItem('refreshToken'),
   username: localStorage.getItem('username'),
-  setAuth: (token, username) => {
+  setAuth: (token, refreshToken, username) => {
       localStorage.setItem('token', token);
+      localStorage.setItem('refreshToken', refreshToken);
       localStorage.setItem('username', username);
-      set({ token, username });
+      set({ token, refreshToken, username });
   },
   logout: () => {
       localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
       localStorage.removeItem('username');
-      set({ token: null, username: null });
+      set({ token: null, refreshToken: null, username: null });
   }
 }));
