@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Input, List, Avatar, Spin, message } from 'antd';
+import { Button, Input, List, Avatar, Spin, App } from 'antd';
 import { RobotOutlined, UserOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { analyzeWatchlist } from '../api';
 
@@ -9,6 +9,7 @@ interface Message {
 }
 
 export const AIChat = ({ }: { open: boolean; onClose: () => void; isMobile?: boolean }) => {
+  const { message } = App.useApp();
   const [messages, setMessages] = useState<Message[]>([
     { role: 'ai', content: '您好，我是您的智能投资助手。我可以帮您分析自选股，或者回答市场相关问题。' }
   ]);

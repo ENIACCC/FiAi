@@ -106,7 +106,13 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
             collapsed={collapsed}
             onCollapse={(value) => setCollapsed(value)}
             theme={isDark ? 'dark' : 'light'} 
-            style={{ borderRight: `1px solid ${token.colorBorderSecondary}` }}
+            style={{ 
+              borderRight: `1px solid ${token.colorBorderSecondary}`,
+              overflow: 'auto',
+              height: 'calc(100vh - 64px)',
+              position: 'sticky',
+              top: 64,
+            }}
           >
             <Menu 
               mode="inline" 
@@ -131,7 +137,12 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
             onCollapse={setPcAiCollapsed}
             collapsedWidth={0}
             theme={isDark ? 'dark' : 'light'}
-            style={{ borderLeft: `1px solid ${token.colorBorderSecondary}` }}
+            style={{ 
+              borderLeft: `1px solid ${token.colorBorderSecondary}`,
+              height: 'calc(100vh - 64px)',
+              position: 'sticky',
+              top: 64,
+            }}
             trigger={null}
           >
              <div style={{ height: '100%', display: pcAiCollapsed ? 'none' : 'block' }}>

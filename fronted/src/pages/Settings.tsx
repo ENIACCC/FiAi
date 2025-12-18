@@ -1,16 +1,15 @@
 import { MainLayout } from '../layout/MainLayout';
 import { useState, useEffect } from 'react';
-import { Card, Form, Input, Button, Tabs, message, Typography, Alert, Select } from 'antd';
+import { Card, Form, Input, Button, Tabs, App, Typography, Alert, Select } from 'antd';
 import { UserOutlined, LockOutlined, ApiOutlined, SaveOutlined } from '@ant-design/icons';
 import axios from 'axios';
-
-const { Title } = Typography;
 
 export const Settings = () => {
   const [form] = Form.useForm();
   const [passwordForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const { message } = App.useApp();
 
   const fetchUserInfo = async () => {
     try {

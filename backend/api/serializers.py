@@ -1,6 +1,12 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import AIAnalysisLog, UserProfile
+from .models import AIAnalysisLog, UserProfile, WatchlistGroup
+
+class WatchlistGroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WatchlistGroup
+        fields = ['id', 'name', 'created_at']
+        read_only_fields = ['id', 'created_at']
 
 class AIAnalysisLogSerializer(serializers.ModelSerializer):
     class Meta:

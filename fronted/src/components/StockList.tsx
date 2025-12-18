@@ -1,49 +1,32 @@
-import { Table, Button, Input, Space, message, Segmented, Tag } from 'antd';
-import { StarFilled, AppstoreOutlined, StarOutlined } from '@ant-design/icons';
-import { useState, useMemo } from 'react';
+import { Table, Button, Input, Space, Tag, Popconfirm } from 'antd';
+import { StarFilled, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useStore } from '../store/useStore';
-import * as api from '../api';
 
-export const StockList = ({ data, loading, onSearch }: { data: any[]; loading: boolean; onSearch: (val: string) => void }) => {
-  const { watchlist, addToWatchlist, removeFromWatchlist } = useStore();
-  const [filterMode, setFilterMode] = useState<'all' | 'watchlist'>('all');
+interface StockListProps {
+  data: any[];
+  loading: boolean;
+  onSearch?: (val: string) => void;
+  actionType?: 'add' | 'remove';
+  onAction?: (record: any) => void;
+  height?: number | string;
+}
 
-  const handleToggleWatchlist = async (record: any) => {
-    try {
-      if (watchlist.has(record.ts_code)) {
-        await api.removeFromWatchlist(record.ts_code);
-        removeFromWatchlist(record.ts_code);
-        message.success(`已从自选移除: ${record.name}`);
-      } else {
-        await api.addToWatchlist({ ts_code: record.ts_code, name: record.name });
-        addToWatchlist(record.ts_code);
-        message.success(`已加入自选: ${record.name}`);
-      }
-    } catch (error) {
-      message.error('操作失败');
-      console.error(error);
-    }
-  };
-
-  // We rely on backend search now for 'all' mode with searchText
-  // But for 'watchlist' mode, we might still want to filter locally? 
-  // Or just display watchlist.
-  
-  const filteredData = useMemo(() => {
-    // If we have data from backend (which is already filtered by search if onSearch called),
-    // we just need to filter by watchlist if mode is watchlist.
-    if (filterMode === 'watchlist') {
-        return data.filter(item => watchlist.has(item.ts_code));
-    }
-    return data;
-  }, [data, filterMode, watchlist]);
+export const StockList = ({ 
+  data, 
+  loading, 
+  onSearch, 
+  actionType = 'add', 
+  onAction,
+  height 
+}: StockListProps) => {
+  const { watchlist } = useStore();
 
   const columns = [
     { title: '代码', dataIndex: 'ts_code', width: 100, render: (text: string) => <Tag>{text}</Tag> },
     { title: '名称', dataIndex: 'name', width: 120, render: (text: string, record: any) => (
       <Space>
         <span style={{ fontWeight: 500 }}>{text}</span>
-        {watchlist.has(record.ts_code) && <StarFilled style={{ color: '#faad14' }} />}
+        {watchlist.has(record.ts_code) && <StarFilled style={{ color: '#faad14', fontSize: 12 }} />}
       </Space>
     )},
     { title: '最新价', dataIndex: 'price', width: 100, render: (val: number, record: any) => (
@@ -58,51 +41,55 @@ export const StockList = ({ data, loading, onSearch }: { data: any[]; loading: b
     )},
     { title: '换手率%', dataIndex: 'turnover_rate', width: 100, render: (val: number) => val ? `${val}%` : '-' },
     { title: '市盈率', dataIndex: 'pe', width: 100, render: (val: number) => val ? val.toFixed(2) : '-' },
+    { title: '行业', dataIndex: 'industry', width: 100, render: (text: string) => text || '-' },
+    { title: '总市值', dataIndex: 'market_cap', width: 120, render: (val: number) => val ? (val / 100000000).toFixed(2) + '亿' : '-' },
     {
       title: '操作',
       key: 'action',
       width: 100,
-      render: (_: any, record: any) => (
-        <Button 
-          type={watchlist.has(record.ts_code) ? 'default' : 'primary'}
-          ghost={!watchlist.has(record.ts_code)}
-          size="small"
-          icon={watchlist.has(record.ts_code) ? <StarFilled /> : <StarOutlined />}
-          onClick={() => handleToggleWatchlist(record)}
-        >
-          {watchlist.has(record.ts_code) ? '已关注' : '关注'}
-        </Button>
-      ),
+      fixed: 'right' as const,
+      render: (_: any, record: any) => {
+        if (actionType === 'remove') {
+            return (
+                <Popconfirm title="确定移出该分组吗？" onConfirm={() => onAction && onAction(record)}>
+                    <Button danger type="text" icon={<DeleteOutlined />}>移除</Button>
+                </Popconfirm>
+            )
+        }
+        return (
+            <Button 
+              type="primary"
+              ghost
+              size="small"
+              icon={<PlusOutlined />}
+              onClick={() => onAction && onAction(record)}
+            >
+              添加
+            </Button>
+        );
+      },
     },
   ];
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Segmented
-          options={[
-            { label: '全部股票', value: 'all', icon: <AppstoreOutlined /> },
-            { label: '我的自选', value: 'watchlist', icon: <StarFilled /> },
-          ]}
-          value={filterMode}
-          onChange={(value) => setFilterMode(value as 'all' | 'watchlist')}
-        />
-
-        <Input.Search 
-          placeholder="搜索股票代码/名称" 
-          allowClear
-          style={{ width: 260 }} 
-          onSearch={val => onSearch(val)}
-          // Trigger search on enter or clear
-        />
-      </div>
+      {onSearch && (
+        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
+            <Input.Search 
+            placeholder="搜索股票代码/名称" 
+            allowClear
+            style={{ width: 260 }} 
+            onSearch={val => onSearch(val)}
+            />
+        </div>
+      )}
 
       <Table 
         columns={columns} 
-        dataSource={filteredData} 
+        dataSource={data} 
         rowKey="ts_code" 
         loading={loading}
-        scroll={{ x: 600 }}
+        scroll={{ x: 800, y: height }}
         pagination={{ 
           pageSize: 10,
           showTotal: (total) => `共 ${total} 条数据`

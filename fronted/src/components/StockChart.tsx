@@ -1,7 +1,7 @@
 import ReactECharts from 'echarts-for-react';
 import { useStore } from '../store/useStore';
 
-export const StockChart = ({ data }: { data: any[] }) => {
+export const StockChart = ({ data, title }: { data: any[]; title?: string }) => {
   const isDark = useStore(state => state.isDark);
   
   if (!data || data.length === 0) {
@@ -14,7 +14,7 @@ export const StockChart = ({ data }: { data: any[] }) => {
         color: isDark ? '#ccc' : '#999',
         fontSize: 14
       }}>
-        暂无数据 (Tushare API 未响应)
+        暂无数据（数据源未响应）
       </div>
     );
   }
@@ -22,7 +22,7 @@ export const StockChart = ({ data }: { data: any[] }) => {
   const option = {
     backgroundColor: 'transparent',
     title: {
-      text: '今日涨幅榜 Top 10',
+      text: title || '今日涨幅榜 Top 10',
       left: 'center',
       textStyle: { color: isDark ? '#fff' : '#333' }
     },
@@ -31,7 +31,9 @@ export const StockChart = ({ data }: { data: any[] }) => {
       formatter: (params: any) => {
         const item = params[0];
         const dataItem = data[item.dataIndex];
-        return `${item.name}<br/>代码: ${dataItem.code}<br/>涨幅: ${item.value}%<br/>现价: ${dataItem.price}`;
+        const priceLine = typeof dataItem.price !== 'undefined' ? `<br/>现价: ${dataItem.price}` : '';
+        const extraLine = typeof dataItem.market_cap !== 'undefined' ? `<br/>总市值: ${(dataItem.market_cap / 100000000).toFixed(2)}亿` : '';
+        return `${item.name}<br/>代码: ${dataItem.code || '-'}<br/>涨幅: ${item.value}%${priceLine}${extraLine}`;
       }
     },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },

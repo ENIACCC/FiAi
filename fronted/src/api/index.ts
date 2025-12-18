@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api/',
+  baseURL: '/api/',
 });
 
 api.interceptors.request.use((config) => {
@@ -17,9 +17,18 @@ export const register = (data: any) => api.post('register/', data);
 export const getStocks = (q?: string) => api.get('stock/', { params: { q } });
 export const getMarketIndex = () => api.get('market/index/');
 export const getTopGainers = () => api.get('market/top-gainers/');
-export const getWatchlist = () => api.get('watchlist/');
-export const addToWatchlist = (data: { ts_code: string; name: string }) => api.post('watchlist/', data);
-export const removeFromWatchlist = (ts_code: string) => api.delete(`watchlist/?ts_code=${ts_code}`);
+export const getTopIndustries = () => api.get('market/top-industries/');
+
+// Watchlist Groups
+export const getWatchlistGroups = () => api.get('watchlist-groups/');
+export const createWatchlistGroup = (name: string) => api.post('watchlist-groups/', { name });
+export const deleteWatchlistGroup = (id: string) => api.delete(`watchlist-groups/${id}/`);
+
+// Watchlist Items
+export const getWatchlist = (group_id?: string) => api.get('watchlist/', { params: { group_id } });
+export const addToWatchlist = (data: { ts_code: string; name: string; group_id?: string }) => api.post('watchlist/', data);
+export const removeFromWatchlist = (ts_code: string, group_id?: string) => api.delete(`watchlist/`, { params: { ts_code, group_id } });
+
 export const analyzeWatchlist = () => api.post('ai/analyze/');
 
 export default api;
