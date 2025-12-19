@@ -5,3 +5,165 @@ body {
     'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
     'Noto Color Emoji';
 }
+
+.gear-btn {
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+.gear-btn:hover {
+  border-color: #1677ff;
+  background-color: #f5f7ff;
+  color: #1677ff;
+}
+.gear-btn:active {
+  border-color: #0958d9;
+  background-color: #eef3ff;
+  color: #0958d9;
+}
+
+/* Remove dropdown menu shadow */
+.ant-dropdown .ant-dropdown-menu {
+  box-shadow: none !important;
+}
+ 
+.chat-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.chat-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: center;
+  background: transparent;
+}
+.chat-stream {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 0;
+}
+.chat-inner {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.chat-row {
+  display: flex;
+  align-items: flex-end;
+  padding: 0 8px;
+}
+.chat-row.ai {
+  justify-content: flex-start;
+}
+.chat-row.user {
+  justify-content: flex-end;
+}
+.bubble {
+  max-width: 70%;
+  padding: 10px 12px;
+  border-radius: 18px;
+  position: relative;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.bubble.ai {
+  background: #f2f2f7;
+  color: #222;
+}
+.bubble.user {
+  background: #1677ff;
+  color: #fff;
+}
+.bubble.ai::before,
+.bubble.ai::after,
+.bubble.user::before,
+.bubble.user::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+}
+/* iMessage-style curved tail for AI (left side) */
+.bubble.ai::before {
+  left: -6px;
+  bottom: 0;
+  background: #f2f2f7;
+  border-bottom-left-radius: 16px;
+}
+.bubble.ai::after {
+  left: -12px;
+  bottom: -2px;
+  background: #fff; /* page bg to carve the curve */
+  border-bottom-left-radius: 16px;
+}
+/* iMessage-style curved tail for User (right side) */
+.bubble.user::before {
+  right: -6px;
+  bottom: 0;
+  background: #1677ff;
+  border-bottom-right-radius: 16px;
+}
+.bubble.user::after {
+  right: -12px;
+  bottom: -2px;
+  background: #fff; /* page bg to carve the curve */
+  border-bottom-right-radius: 16px;
+}
+.chat-text {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  font-size: 14px;
+}
+.chat-input-panel {
+  border-top: 1px solid #f0f0f0;
+  padding: 12px 16px;
+  background: rgba(250,250,250,0.6);
+}
+.chat-textarea {
+  max-width: 780px;
+  margin: 0 auto;
+  display: block;
+}
+.chat-actions {
+  max-width: 780px;
+  margin: 8px auto 0;
+  display: flex;
+  justify-content: flex-end;
+}
+.typing {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #1677ff;
+  display: inline-block;
+  animation: typingBlink 1.2s infinite ease-in-out;
+}
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes typingBlink {
+  0% { opacity: 0.3; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-2px); }
+  100% { opacity: 0.3; transform: translateY(0); }
+}
+
+/* Disable all bubble tails for clean round bubbles */
+.bubble.ai::before,
+.bubble.ai::after,
+.bubble.user::before,
+.bubble.user::after {
+  content: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}

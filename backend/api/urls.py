@@ -7,7 +7,8 @@ from rest_framework_simplejwt.views import (
 from .views import (
     StockDataView, WatchlistView, AIAnalyzeView, RegisterView, 
     MarketIndexView, TopGainersView, AIAnalysisLogViewSet,
-    UserInfoView, ChangePasswordView, TopIndustriesView, WatchlistGroupViewSet
+    UserInfoView, ChangePasswordView, TopIndustriesView, WatchlistGroupViewSet,
+    WatchlistCountView
 )
 
 router = DefaultRouter()
@@ -20,6 +21,7 @@ urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
     path('stock/', StockDataView.as_view(), name='stock_data'),
     path('watchlist/', WatchlistView.as_view(), name='watchlist'),
+    path('watchlist/count/', WatchlistCountView.as_view(), name='watchlist_count'),
     path('ai/analyze/', AIAnalyzeView.as_view(), name='ai_analyze'),
     path('market/index/', MarketIndexView.as_view(), name='market_index'),
     path('market/top-gainers/', TopGainersView.as_view(), name='top_gainers'),

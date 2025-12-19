@@ -1,12 +1,20 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import AIAnalysisLog, UserProfile, WatchlistGroup
+from .models import AIAnalysisLog, UserProfile, WatchlistGroup, Watchlist
 
 class WatchlistGroupSerializer(serializers.ModelSerializer):
+    item_count = serializers.SerializerMethodField()
     class Meta:
         model = WatchlistGroup
-        fields = ['id', 'name', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = ['id', 'name', 'created_at', 'item_count']
+        read_only_fields = ['id', 'created_at', 'item_count']
+    
+    def get_item_count(self, obj):
+        request = self.context.get('request', None)
+        user_id = request.user.id if request and request.user and request.user.id else None
+        if user_id is None:
+            return 0
+        return Watchlist.objects.filter(user_id=user_id, group_id=obj.id).count()
 
 class AIAnalysisLogSerializer(serializers.ModelSerializer):
     class Meta:

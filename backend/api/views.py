@@ -14,6 +14,7 @@ import datetime
 import akshare as ak
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from django.db.models import Count
 
 # Helper functions for caching heavy data
 def get_cached_stock_data():
@@ -454,15 +455,28 @@ class WatchlistGroupViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user_id=self.request.user.id)
 
+class WatchlistCountView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        user_id = request.user.id
+        default_count = Watchlist.objects.filter(user_id=user_id, group__isnull=True).count()
+        # Build group counts
+        group_counts = {}
+        for g in WatchlistGroup.objects.filter(user_id=user_id):
+            group_counts[str(g.id)] = Watchlist.objects.filter(user_id=user_id, group_id=g.id).count()
+        return Response({
+            "status": "success",
+            "data": {
+                "default": default_count,
+                "groups": group_counts
+            }
+        })
+
 # Helper function to fetch single stock data
 def fetch_single_stock_data(ts_code):
     try:
         # ts_code format: 000001.SZ -> 000001
         symbol = ts_code.split('.')[0]
-        
-        # Check if ETF (Starts with 51, 56, 58, 15, 16)
-        is_etf = symbol.startswith(('51', '56', '58', '15', '16'))
-        
         data = {
             "ts_code": ts_code,
             "name": "",
@@ -474,59 +488,36 @@ def fetch_single_stock_data(ts_code):
             "market_cap": 0,
             "success": False
         }
-
-        if is_etf:
-            # Use ETF History for latest snapshot (works for single ETF)
+        # Use Stock Bid/Ask for Stocks (Realtime)
+        try:
+            df = ak.stock_bid_ask_em(symbol=symbol)
+            # df columns: item, value
+            info_map = dict(zip(df['item'], df['value']))
+            
+            data.update({
+                "price": info_map.get('最新', 0),
+                "change_pct": info_map.get('涨幅', 0),
+                "volume": info_map.get('总手', 0),
+                "turnover_rate": info_map.get('换手', 0),
+                # PE is not available in bid_ask, accept 0 or missing
+                "success": True
+            })
+        except Exception as e:
+            print(f"Stock fetch failed for {ts_code}: {e}")
+            # Fallback to history if bid/ask fails
             try:
-                df = ak.fund_etf_hist_em(symbol=symbol, period='daily', start_date='20240101', adjust='qfq')
-                if not df.empty:
-                    last_row = df.iloc[-1]
+                df_hist = ak.stock_zh_a_hist(symbol=symbol, period="daily", start_date="20240101", adjust="qfq")
+                if not df_hist.empty:
+                    last_row = df_hist.iloc[-1]
                     data.update({
                         "price": last_row['收盘'],
                         "change_pct": last_row['涨跌幅'],
-                        "volume": last_row['成交量'], # This might be in lots or shares? Usually volume
+                        "volume": last_row['成交量'],
                         "turnover_rate": last_row['换手率'],
                         "success": True
                     })
-                    # Name is not in hist, but we might have it in watchlist name or need another call
-                    # For now, let's rely on watchlist name or user-saved name if possible?
-                    # Actually Watchlist model has 'name'. But enriched data overrides it? 
-                    # The WatchlistView uses enriched data if available.
-                    # We should try to preserve the name from Watchlist if API doesn't give it.
-            except Exception as e:
-                print(f"ETF fetch failed for {ts_code}: {e}")
+            except:
                 return {"ts_code": ts_code, "success": False}
-        else:
-            # Use Stock Bid/Ask for Stocks (Realtime)
-            try:
-                df = ak.stock_bid_ask_em(symbol=symbol)
-                # df columns: item, value
-                info_map = dict(zip(df['item'], df['value']))
-                
-                data.update({
-                    "price": info_map.get('最新', 0),
-                    "change_pct": info_map.get('涨幅', 0),
-                    "volume": info_map.get('总手', 0),
-                    "turnover_rate": info_map.get('换手', 0),
-                    # PE is not available in bid_ask, accept 0 or missing
-                    "success": True
-                })
-            except Exception as e:
-                print(f"Stock fetch failed for {ts_code}: {e}")
-                # Fallback to history if bid/ask fails
-                try:
-                    df_hist = ak.stock_zh_a_hist(symbol=symbol, period="daily", start_date="20240101", adjust="qfq")
-                    if not df_hist.empty:
-                        last_row = df_hist.iloc[-1]
-                        data.update({
-                            "price": last_row['收盘'],
-                            "change_pct": last_row['涨跌幅'],
-                            "volume": last_row['成交量'],
-                            "turnover_rate": last_row['换手率'],
-                            "success": True
-                        })
-                except:
-                    return {"ts_code": ts_code, "success": False}
         
         return data
 
@@ -555,34 +546,72 @@ class WatchlistView(APIView):
         enriched_data = []
         
         # Strategy: 
-        # If items < 20, use parallel individual fetch (faster for small lists).
+        # If items < 20, use parallel individual fetch for stocks + single batch for ETFs.
         # If items >= 20, use full list fetch (efficient for large lists).
         if len(watchlist_items) < 20:
             ts_codes = [item['ts_code'] for item in watchlist_items]
             results_map = {}
+
+            # Split into ETF and Stock symbols
+            stock_symbols = []
+            etf_symbols = []
+            for code in ts_codes:
+                sym = code.split('.')[0]
+                if sym.startswith(('51', '56', '58', '15', '16', '159')):
+                    etf_symbols.append(sym)
+                else:
+                    stock_symbols.append(code)
+
+            # Batch fetch ETFs once
+            if etf_symbols:
+                try:
+                    df_etf_spot = ak.fund_etf_spot_em()
+                    if not df_etf_spot.empty:
+                        for sym in etf_symbols:
+                            row = df_etf_spot[df_etf_spot['代码'] == sym]
+                            if not row.empty:
+                                r = row.iloc[0]
+                                ts = f"{sym}.SZ" if sym.startswith(('15','16','159')) else f"{sym}.SH"
+                                results_map[ts] = {
+                                    "price": r.get('最新价', 0),
+                                    "change_pct": r.get('涨跌幅', 0),
+                                    "volume": r.get('成交量', 0),
+                                    "turnover_rate": r.get('换手率', 0),
+                                    "pe": None,
+                                    "market_cap": r.get('总市值', 0),
+                                    "name": r.get('名称', ''),
+                                    "success": True
+                                }
+                except Exception as e:
+                    print(f"ETF spot fetch failed: {e}")
             
-            with ThreadPoolExecutor(max_workers=min(len(ts_codes), 20)) as executor:
-                # Map future to ts_code
-                future_to_code = {executor.submit(fetch_single_stock_data, code): code for code in ts_codes}
-                
-                for future in as_completed(future_to_code):
-                    data = future.result()
-                    if data.get('success'):
-                        results_map[data['ts_code']] = data
+            # Only spawn threads when there are stock symbols to fetch
+            if stock_symbols:
+                with ThreadPoolExecutor(max_workers=min(len(stock_symbols), 20)) as executor:
+                    # Map future to ts_code
+                    future_to_code = {executor.submit(fetch_single_stock_data, code): code for code in stock_symbols}
+                    
+                    for future in as_completed(future_to_code):
+                        data = future.result()
+                        if data.get('success'):
+                            results_map[data['ts_code']] = data
             
             # Merge results
             for item in watchlist_items:
                 ts_code = item['ts_code']
                 if ts_code in results_map:
                     stock_data = results_map[ts_code]
-                    item.update({
+                    merged = {
                         "price": stock_data['price'],
                         "change_pct": stock_data['change_pct'], # Note: individual API might lack this
                         "volume": stock_data['volume'],
                         "turnover_rate": stock_data['turnover_rate'],
                         "pe": stock_data['pe'],
                         "market_cap": stock_data['market_cap']
-                    })
+                    }
+                    if stock_data.get('name'):
+                        merged["name"] = stock_data['name']
+                    item.update(merged)
                 else:
                     # Failed to fetch, keep as None or 0
                     pass
@@ -701,7 +730,7 @@ class WatchlistView(APIView):
         ).exists()
         
         if exists:
-             return Response({"status": "info", "message": "Already in this watchlist group"})
+             return Response({"status": "info", "message": "已在该分组中"})
 
         Watchlist.objects.create(
             ts_code=ts_code, 
@@ -709,7 +738,7 @@ class WatchlistView(APIView):
             name=name,
             group=group
         )
-        return Response({"status": "success", "message": "Added to watchlist"})
+        return Response({"status": "success", "message": "已添加到自选"})
 
     def delete(self, request):
         ts_code = request.query_params.get('ts_code')
@@ -725,15 +754,21 @@ class WatchlistView(APIView):
             qs = qs.filter(group__isnull=True) # Default if no group specified
             
         qs.delete()
-        return Response({"status": "success", "message": "Removed from watchlist"})
+        return Response({"status": "success", "message": "已从自选移除"})
 
 class AIAnalyzeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         # Mock AI Analysis
-        # Receives a list of stocks or uses the watchlist
-        watchlist = Watchlist.objects.filter(user_id=request.user.id)
+        # Receives optional group_id to analyze current group only
+        group_id = request.data.get('group_id')
+        qs = Watchlist.objects.filter(user_id=request.user.id)
+        if group_id:
+            qs = qs.filter(group_id=group_id)
+        else:
+            qs = qs.filter(group__isnull=True)
+        watchlist = list(qs)
         if not watchlist:
             return Response({"status": "info", "message": "自选股为空，请先添加股票。"})
         
@@ -760,7 +795,8 @@ class AIAnalyzeView(APIView):
                 "action": "买入" if sentiment == "看涨" else ("卖出" if sentiment == "看跌" else "持有")
             })
             
-        ai_response = f"我对您当前的自选股组合进行了深度分析（基于模型: {ai_model}）。\n\n"
+        group_name = "默认分组" if not group_id else (WatchlistGroup.objects.filter(id=group_id, user_id=request.user.id).first() or WatchlistGroup(name="当前分组")).name
+        ai_response = f"我对您当前的自选股（{group_name}）进行了分析（模型: {ai_model}）。\n\n"
         for item in analysis_results:
             ai_response += f"**{item['name']} ({item['ts_code']})**\n"
             ai_response += f"- 建议：{item['action']} (置信度: {item['score']}%)\n"
@@ -775,7 +811,7 @@ class AIAnalyzeView(APIView):
             # Let's save a "Portfolio Analysis" log entry.
             AIAnalysisLog.objects.create(
                 ts_code="PORTFOLIO",
-                stock_name="自选股组合",
+                stock_name=f"自选股 - {group_name}",
                 analysis_content=ai_response
             )
         except Exception as e:

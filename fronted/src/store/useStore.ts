@@ -7,6 +7,8 @@ interface AppState {
   addToWatchlist: (code: string) => void;
   removeFromWatchlist: (code: string) => void;
   setWatchlist: (codes: string[]) => void;
+  activeGroupId: string;
+  setActiveGroupId: (id: string) => void;
   token: string | null;
   refreshToken: string | null;
   username: string | null;
@@ -29,6 +31,8 @@ export const useStore = create<AppState>((set) => ({
     return { watchlist: newSet };
   }),
   setWatchlist: (codes) => set({ watchlist: new Set(codes) }),
+  activeGroupId: 'default',
+  setActiveGroupId: (id) => set({ activeGroupId: id }),
   token: localStorage.getItem('token'),
   refreshToken: localStorage.getItem('refreshToken'),
   username: localStorage.getItem('username'),

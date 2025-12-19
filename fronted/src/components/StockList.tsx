@@ -40,8 +40,6 @@ export const StockList = ({
         </span>
     )},
     { title: '换手率%', dataIndex: 'turnover_rate', width: 100, render: (val: number) => val ? `${val}%` : '-' },
-    { title: '市盈率', dataIndex: 'pe', width: 100, render: (val: number) => val ? val.toFixed(2) : '-' },
-    { title: '行业', dataIndex: 'industry', width: 100, render: (text: string) => text || '-' },
     { title: '总市值', dataIndex: 'market_cap', width: 120, render: (val: number) => val ? (val / 100000000).toFixed(2) + '亿' : '-' },
     {
       title: '操作',

@@ -22,13 +22,15 @@ export const getTopIndustries = () => api.get('market/top-industries/');
 // Watchlist Groups
 export const getWatchlistGroups = () => api.get('watchlist-groups/');
 export const createWatchlistGroup = (name: string) => api.post('watchlist-groups/', { name });
+export const updateWatchlistGroup = (id: string, name: string) => api.patch(`watchlist-groups/${id}/`, { name });
 export const deleteWatchlistGroup = (id: string) => api.delete(`watchlist-groups/${id}/`);
+export const getWatchlistCount = () => api.get('watchlist/count/');
 
 // Watchlist Items
 export const getWatchlist = (group_id?: string) => api.get('watchlist/', { params: { group_id } });
 export const addToWatchlist = (data: { ts_code: string; name: string; group_id?: string }) => api.post('watchlist/', data);
 export const removeFromWatchlist = (ts_code: string, group_id?: string) => api.delete(`watchlist/`, { params: { ts_code, group_id } });
 
-export const analyzeWatchlist = () => api.post('ai/analyze/');
+export const analyzeWatchlist = (group_id?: string) => api.post('ai/analyze/', { group_id });
 
 export default api;

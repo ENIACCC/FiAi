@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Button, Input, List, Avatar, Spin, App } from 'antd';
-import { RobotOutlined, UserOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { Button, Input, App } from 'antd';
+import { ThunderboltOutlined } from '@ant-design/icons';
 import { analyzeWatchlist } from '../api';
+import { useStore } from '../store/useStore';
 
 interface Message {
   role: 'ai' | 'user';
@@ -10,6 +11,7 @@ interface Message {
 
 export const AIChat = ({ }: { open: boolean; onClose: () => void; isMobile?: boolean }) => {
   const { message } = App.useApp();
+  const activeGroupId = useStore(state => state.activeGroupId);
   const [messages, setMessages] = useState<Message[]>([
     { role: 'ai', content: '您好，我是您的智能投资助手。我可以帮您分析自选股，或者回答市场相关问题。' }
   ]);
@@ -18,10 +20,12 @@ export const AIChat = ({ }: { open: boolean; onClose: () => void; isMobile?: boo
 
   const handleAnalyze = async () => {
     setLoading(true);
-    setMessages(prev => [...prev, { role: 'user', content: '分析自选股' }]);
+    const groupText = activeGroupId === 'default' ? '默认分组' : '当前分组';
+    setMessages(prev => [...prev, { role: 'user', content: `分析${groupText}自选股` }]);
     try {
-      const res = await analyzeWatchlist();
-      setMessages(prev => [...prev, { role: 'ai', content: res.data.analysis }]);
+      const res = await analyzeWatchlist(activeGroupId === 'default' ? undefined : activeGroupId);
+      const aiMsg = res?.data?.data?.message || '分析完成';
+      setMessages(prev => [...prev, { role: 'ai', content: aiMsg }]);
     } catch (error) {
       message.error('分析失败');
       console.error(error);
@@ -40,36 +44,51 @@ export const AIChat = ({ }: { open: boolean; onClose: () => void; isMobile?: boo
   };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: 16, borderBottom: '1px solid #f0f0f0' }}>
-         <Button type="primary" block icon={<ThunderboltOutlined />} onClick={handleAnalyze} loading={loading}>
-           一键分析自选股
-         </Button>
+    <div className="chat-container">
+      <div className="chat-header">
+        <Button type="primary" icon={<ThunderboltOutlined />} onClick={handleAnalyze} loading={loading}>
+          一键分析自选股
+        </Button>
       </div>
-      <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
-        <List
-          itemLayout="horizontal"
-          dataSource={messages}
-          renderItem={(item) => (
-            <List.Item>
-              <List.Item.Meta
-                avatar={<Avatar icon={item.role === 'ai' ? <RobotOutlined /> : <UserOutlined />} style={{ backgroundColor: item.role === 'ai' ? '#1677ff' : '#87d068' }} />}
-                title={item.role === 'ai' ? 'AI 助手' : '我'}
-                description={<div style={{ whiteSpace: 'pre-wrap' }}>{item.content}</div>}
-              />
-            </List.Item>
+      <div className="chat-stream">
+        <div className="chat-inner">
+          {messages.map((m, idx) => (
+            <div key={idx} className={`chat-row ${m.role}`}>
+              <div className={`bubble ${m.role}`}>
+                <div className="chat-text">{m.content}</div>
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="chat-row ai">
+              <div className="bubble ai">
+                <div className="typing">
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
+                </div>
+              </div>
+            </div>
           )}
-        />
-        {loading && <Spin tip="正在分析..." style={{ marginTop: 16 }} />}
+        </div>
       </div>
-      <div style={{ padding: 16, borderTop: '1px solid #f0f0f0', display: 'flex', gap: 8 }}>
-        <Input 
-          value={input} 
-          onChange={e => setInput(e.target.value)} 
-          onPressEnter={handleSend} 
-          placeholder="输入问题..." 
+      <div className="chat-input-panel">
+        <Input.TextArea
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onPressEnter={(e) => {
+            if (!e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+          placeholder="输入问题，Shift+Enter 换行"
+          autoSize={{ minRows: 2, maxRows: 6 }}
+          className="chat-textarea"
         />
-        <Button type="primary" onClick={handleSend}>发送</Button>
+        <div className="chat-actions">
+          <Button type="primary" onClick={handleSend}>发送</Button>
+        </div>
       </div>
     </div>
   );
