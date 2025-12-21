@@ -1,6 +1,7 @@
 import { Table, Button, Input, Space, Tag, Popconfirm } from 'antd';
-import { StarFilled, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import { StarFilled, DeleteOutlined, PlusOutlined, MessageOutlined } from '@ant-design/icons';
 import { useStore } from '../store/useStore';
+import { useNavigate } from 'react-router-dom';
 
 interface StockListProps {
   data: any[];
@@ -19,13 +20,33 @@ export const StockList = ({
   onAction,
   height 
 }: StockListProps) => {
-  const { watchlist } = useStore();
+  const { watchlist, setAiChatOpen, setAiContext } = useStore();
+  const navigate = useNavigate();
+
+  const handleAiChat = (record: any) => {
+    setAiContext({
+      type: 'stock',
+      data: record
+    });
+    setAiChatOpen(true);
+  };
 
   const columns = [
-    { title: '代码', dataIndex: 'ts_code', width: 100, render: (text: string) => <Tag>{text}</Tag> },
-    { title: '名称', dataIndex: 'name', width: 120, render: (text: string, record: any) => (
+    {
+      title: '代码',
+      dataIndex: 'ts_code',
+      width: 120,
+      render: (text: string) => (
+        <Tag style={{ cursor: 'pointer' }} onClick={() => navigate(`/stocks/${text}`)}>
+          {text}
+        </Tag>
+      ),
+    },
+    { title: '名称', dataIndex: 'name', width: 160, render: (text: string, record: any) => (
       <Space>
-        <span style={{ fontWeight: 500 }}>{text}</span>
+        <Button type="link" style={{ padding: 0, height: 22 }} onClick={() => navigate(`/stocks/${record.ts_code}`)}>
+          {text}
+        </Button>
         {watchlist.has(record.ts_code) && <StarFilled style={{ color: '#faad14', fontSize: 12 }} />}
       </Space>
     )},
@@ -44,14 +65,24 @@ export const StockList = ({
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 180,
       fixed: 'right' as const,
       render: (_: any, record: any) => {
         if (actionType === 'remove') {
             return (
-                <Popconfirm title="确定移出该分组吗？" onConfirm={() => onAction && onAction(record)}>
-                    <Button danger type="text" icon={<DeleteOutlined />}>移除</Button>
-                </Popconfirm>
+                <Space>
+                    <Button 
+                      type="text" 
+                      icon={<MessageOutlined />}
+                      style={{ color: '#1677ff' }}
+                      onClick={() => handleAiChat(record)}
+                    >
+                      AI聊股
+                    </Button>
+                    <Popconfirm title="确定移出该分组吗？" onConfirm={() => onAction && onAction(record)}>
+                        <Button danger type="text" icon={<DeleteOutlined />}>移除</Button>
+                    </Popconfirm>
+                </Space>
             )
         }
         return (

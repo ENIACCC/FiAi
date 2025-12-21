@@ -1,11 +1,12 @@
 import { MainLayout } from '../layout/MainLayout';
 import { useState, useEffect } from 'react';
-import { Card, Form, Input, Button, Tabs, App, Typography, Alert, Select } from 'antd';
+import { Card, Form, Input, Button, Tabs, App, Alert, Select, Table, Tag, Space, Popconfirm } from 'antd';
 import { UserOutlined, LockOutlined, ApiOutlined, SaveOutlined } from '@ant-design/icons';
-import axios from 'axios';
+import api from '../api';
 
 export const Settings = () => {
-  const [form] = Form.useForm();
+  const [basicForm] = Form.useForm();
+  const [aiForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -13,18 +14,17 @@ export const Settings = () => {
 
   const fetchUserInfo = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      
-      const res = await axios.get('http://127.0.0.1:8000/api/user/info/', {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await api.get('user/info/');
+      setUser(res.data || null);
+      basicForm.setFieldsValue({
+        username: res.data?.username,
+        email: res.data?.email,
       });
-      setUser(res.data);
-      form.setFieldsValue({
-        username: res.data.username,
-        email: res.data.email,
-        ai_api_key: res.data.profile?.ai_api_key,
-        ai_model: res.data.profile?.ai_model || 'deepseek-chat'
+      aiForm.setFieldsValue({
+        provider: res.data?.profile?.ai_provider || 'deepseek',
+        base_url: res.data?.profile?.ai_base_url || 'https://api.deepseek.com',
+        model: res.data?.profile?.ai_model || 'deepseek-chat',
+        api_key: '',
       });
     } catch (error) {
       console.error("Failed to fetch user info", error);
@@ -36,27 +36,44 @@ export const Settings = () => {
     fetchUserInfo();
   }, []);
 
-  const handleInfoUpdate = async (values: any) => {
+  const handleBasicUpdate = async (values: any) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      // Structure the data to match serializer expectation
-      const updateData = {
-        email: values.email,
-        profile: {
-            ai_api_key: values.ai_api_key,
-            ai_model: values.ai_model
-        }
-      };
-
-      await axios.patch('http://127.0.0.1:8000/api/user/info/', updateData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.patch('user/info/', { email: values.email });
       message.success('设置已更新');
-      fetchUserInfo();
+      await fetchUserInfo();
     } catch (error) {
       console.error("Update failed", error);
       message.error('更新失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAIConfigSave = async (values: any) => {
+    setLoading(true);
+    try {
+      const resp = await api.post('ai-models/', {
+        provider: values.provider || 'deepseek',
+        base_url: values.base_url || 'https://api.deepseek.com',
+        model: values.model || 'deepseek-chat',
+        api_key: values.api_key,
+        set_active: true,
+      });
+      const status = resp?.data?.status;
+      const code = resp?.data?.code;
+      const msg = resp?.data?.message;
+      if (status === 'info' && code === 'duplicate') {
+        message.warning(msg || '该模型配置已存在，请勿重复添加');
+      } else {
+        message.success('AI 模型已保存');
+      }
+      await fetchUserInfo();
+      aiForm.setFieldsValue({ api_key: '' });
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || '保存失败';
+      console.error("AI config save failed", error);
+      message.error(msg);
     } finally {
       setLoading(false);
     }
@@ -70,12 +87,9 @@ export const Settings = () => {
     
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      await axios.post('http://127.0.0.1:8000/api/user/change-password/', {
+      await api.post('user/change-password/', {
         old_password: values.old_password,
         new_password: values.new_password
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       message.success('密码修改成功');
       passwordForm.resetFields();
@@ -90,14 +104,9 @@ export const Settings = () => {
   const items = [
     {
       key: '1',
-      label: (<span><UserOutlined /> 基本信息 & AI 配置</span>),
+      label: (<span><UserOutlined /> 基本信息</span>),
       children: (
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleInfoUpdate}
-          initialValues={user}
-        >
+        <Form form={basicForm} layout="vertical" onFinish={handleBasicUpdate}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <Form.Item label="用户名" name="username">
               <Input disabled />
@@ -106,29 +115,6 @@ export const Settings = () => {
               <Input />
             </Form.Item>
           </div>
-
-          <Form.Item 
-            label="AI 模型" 
-            name="ai_model"
-            initialValue="deepseek-chat"
-            extra="选择用于股票分析的 AI 模型"
-          >
-            <Select>
-                <Select.Option value="deepseek-chat">DeepSeek-V3</Select.Option>
-                <Select.Option value="deepseek-reasoner">DeepSeek-R1 (推理版)</Select.Option>
-                <Select.Option value="gpt-4o">GPT-4o</Select.Option>
-                <Select.Option value="claude-3-5-sonnet">Claude 3.5 Sonnet</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item 
-            label="AI API Key" 
-            name="ai_api_key"
-            extra="配置用于 AI 分析的大模型 API Key"
-          >
-            <Input.Password prefix={<ApiOutlined />} placeholder="sk-..." />
-          </Form.Item>
-
           <Form.Item>
             <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading}>
               保存更改
@@ -139,6 +125,140 @@ export const Settings = () => {
     },
     {
       key: '2',
+      label: (<span><ApiOutlined /> AI 配置</span>),
+      children: (
+        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <Form form={aiForm} layout="vertical" onFinish={handleAIConfigSave}>
+            <Form.Item label="AI 模型" name="model" initialValue="deepseek-chat" extra="选择用于股票分析的 AI 模型">
+              <Select>
+                <Select.Option value="deepseek-chat">deepseek-chat (DeepSeek-V3.2)</Select.Option>
+                <Select.Option value="deepseek-reasoner">deepseek-reasoner (DeepSeek-V3.2 思考模式)</Select.Option>
+              </Select>
+            </Form.Item>
+
+            <Form.Item label="AI Base URL" name="base_url" initialValue="https://api.deepseek.com">
+              <Input />
+            </Form.Item>
+
+            <Form.Item name="provider" initialValue="deepseek" hidden>
+              <Input />
+            </Form.Item>
+
+            <Form.Item
+              label="AI API Key"
+              name="api_key"
+              extra="必填；Key 为空时不允许保存"
+              rules={[
+                { required: true, message: '请输入 API Key' },
+                {
+                  validator: async (_, v) => {
+                    if (typeof v !== 'string' || !v.trim()) {
+                      return Promise.reject(new Error('请输入 API Key'));
+                    }
+                    return Promise.resolve();
+                  },
+                },
+              ]}
+            >
+              <Input.Password prefix={<ApiOutlined />} placeholder="sk-..." />
+            </Form.Item>
+
+            <Form.Item shouldUpdate>
+              {() => {
+                const v = aiForm.getFieldValue('api_key');
+                const disabled = typeof v !== 'string' || !v.trim() || aiForm.getFieldsError().some((f) => f.errors.length);
+                return (
+                  <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading} disabled={disabled}>
+                    保存模型
+                  </Button>
+                );
+              }}
+            </Form.Item>
+          </Form>
+
+          <Card size="small" title="已添加的 AI 模型" variant="borderless">
+            <Table
+              size="small"
+              pagination={false}
+              rowKey={(r) => r.id}
+              dataSource={(user?.profile?.ai_models || []).map((m: any) => ({
+                id: m.id,
+                provider: m.provider,
+                base_url: m.base_url,
+                model: m.model,
+                key_configured: !!m.api_key_configured,
+                key_preview: m.api_key_preview || '-',
+                is_active: String(user?.profile?.active_ai_model_id || '') === String(m.id),
+              }))}
+              columns={[
+                { title: 'Provider', dataIndex: 'provider', key: 'provider' },
+                { title: 'Base URL', dataIndex: 'base_url', key: 'base_url' },
+                { title: '模型', dataIndex: 'model', key: 'model' },
+                {
+                  title: 'Key',
+                  dataIndex: 'key_configured',
+                  key: 'key_configured',
+                  render: (vv: any, row: any) => (
+                    <Space size={8}>
+                      {row.is_active ? <Tag color="blue">当前</Tag> : null}
+                      {vv ? <Tag color="green">已配置</Tag> : <Tag>未配置</Tag>}
+                      <span>{row.key_preview}</span>
+                    </Space>
+                  ),
+                },
+                {
+                  title: '操作',
+                  key: 'actions',
+                  render: (_: any, row: any) => (
+                    <Space size={8}>
+                      <Button
+                        size="small"
+                        disabled={row.is_active}
+                        onClick={async () => {
+                          try {
+                            await api.post(`ai-models/${row.id}/select/`, {});
+                            message.success('已切换当前模型');
+                            await fetchUserInfo();
+                          } catch (error) {
+                            console.error('Select AI model failed', error);
+                            message.error('切换失败');
+                          }
+                        }}
+                      >
+                        设为当前
+                      </Button>
+                      <Popconfirm
+                        title="确定删除该模型配置？"
+                        okText="删除"
+                        cancelText="取消"
+                        okButtonProps={{ danger: true }}
+                        onConfirm={async () => {
+                          try {
+                            await api.delete(`ai-models/${row.id}/`);
+                            message.success('已删除');
+                            await fetchUserInfo();
+                          } catch (error) {
+                            console.error('Delete AI model failed', error);
+                            message.error('删除失败');
+                          }
+                        }}
+                      >
+                        <Button size="small" danger>
+                          删除
+                        </Button>
+                      </Popconfirm>
+                    </Space>
+                  ),
+                },
+              ]}
+              locale={{ emptyText: '暂无已添加模型（先保存一次 AI 配置）' }}
+            />
+          </Card>
+        </Space>
+      ),
+    },
+    {
+      key: '3',
       label: (<span><LockOutlined /> 安全设置</span>),
       children: (
         <Form

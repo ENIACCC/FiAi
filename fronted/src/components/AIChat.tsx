@@ -1,22 +1,81 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { Button, Input, App } from 'antd';
 import { ThunderboltOutlined } from '@ant-design/icons';
-import { analyzeWatchlist } from '../api';
+import { analyzeWatchlist, chatAI } from '../api';
 import { useStore } from '../store/useStore';
+import { useNavigate } from 'react-router-dom';
 
 interface Message {
   role: 'ai' | 'user';
-  content: string;
+  content: string | ReactNode;
 }
 
-export const AIChat = ({ }: { open: boolean; onClose: () => void; isMobile?: boolean }) => {
+export const AIChat = ({ onClose, isMobile }: { open: boolean; onClose: () => void; isMobile?: boolean }) => {
   const { message } = App.useApp();
+  const navigate = useNavigate();
   const activeGroupId = useStore(state => state.activeGroupId);
+  const aiContext = useStore(state => state.aiContext);
+  const setAiContext = useStore(state => state.setAiContext);
+  const [currentStock, setCurrentStock] = useState<any>(null);
   const [messages, setMessages] = useState<Message[]>([
     { role: 'ai', content: '您好，我是您的智能投资助手。我可以帮您分析自选股，或者回答市场相关问题。' }
   ]);
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState('');
+  const processedContextRef = useRef<any>(null);
+
+  const toApiMessages = (extraUserText?: string) => {
+    const base = messages
+      .filter(m => typeof m.content === 'string')
+      .map(m => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.content as string,
+      }));
+    if (extraUserText) {
+      base.push({ role: 'user', content: extraUserText });
+    }
+    return base;
+  };
+
+  const sendText = async (text: string, stock?: any) => {
+    setMessages(prev => [...prev, { role: 'user', content: text }]);
+    setLoading(true);
+    try {
+      const res = await chatAI({ messages: toApiMessages(text), stock });
+      if (res?.data?.status === 'success') {
+        setMessages(prev => [...prev, { role: 'ai', content: res.data.data.message }]);
+        return;
+      }
+
+      if (res?.data?.code === 'missing_api_key') {
+        message.warning('未配置 AI API Key，请前往 设置 页面进行配置');
+        return;
+      }
+
+      message.error(res?.data?.message || 'AI 服务暂时不可用');
+    } catch (error) {
+      const err: any = error;
+      const msg = err?.response?.data?.message || '发送失败';
+      message.error(msg);
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (aiContext && aiContext.type === 'stock' && aiContext.data) {
+       if (processedContextRef.current === aiContext) return;
+       processedContextRef.current = aiContext;
+
+       const stockName = aiContext.data.name;
+       const stockCode = aiContext.data.ts_code || aiContext.data.symbol || aiContext.data.code;
+       const initialMsg = aiContext.message || `我想聊聊 ${stockName} (${stockCode})`;
+       setCurrentStock(aiContext.data);
+       setAiContext(null);
+       sendText(initialMsg, aiContext.data);
+    }
+  }, [aiContext, setAiContext]);
 
   const handleAnalyze = async () => {
     setLoading(true);
@@ -24,10 +83,23 @@ export const AIChat = ({ }: { open: boolean; onClose: () => void; isMobile?: boo
     setMessages(prev => [...prev, { role: 'user', content: `分析${groupText}自选股` }]);
     try {
       const res = await analyzeWatchlist(activeGroupId === 'default' ? undefined : activeGroupId);
-      const aiMsg = res?.data?.data?.message || '分析完成';
-      setMessages(prev => [...prev, { role: 'ai', content: aiMsg }]);
+      if (res?.data?.status === 'success') {
+        setMessages(prev => [...prev, { role: 'ai', content: res.data.data.message }]);
+        return;
+      }
+
+      if (res?.data?.code === 'missing_api_key') {
+        message.warning('未配置 AI API Key，请前往 设置 页面进行配置');
+        navigate('/settings');
+        if (isMobile) onClose();
+        return;
+      }
+
+      message.error(res?.data?.message || '分析服务暂时不可用');
     } catch (error) {
-      message.error('分析失败');
+      const err: any = error;
+      const msg = err?.response?.data?.message || '分析失败';
+      message.error(msg);
       console.error(error);
     } finally {
       setLoading(false);
@@ -36,11 +108,9 @@ export const AIChat = ({ }: { open: boolean; onClose: () => void; isMobile?: boo
 
   const handleSend = () => {
     if (!input.trim()) return;
-    setMessages(prev => [...prev, { role: 'user', content: input }]);
+    const text = input.trim();
     setInput('');
-    setTimeout(() => {
-      setMessages(prev => [...prev, { role: 'ai', content: '这是一个模拟回复。实际功能需要接入大模型API。' }]);
-    }, 1000);
+    sendText(text, currentStock);
   };
 
   return (

@@ -12,6 +12,22 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (resp) => resp,
+  (error) => {
+    const status = error?.response?.status;
+    if (status === 401 || status === 403) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('username');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  },
+);
+
 export const login = (data: any) => api.post('token/', data);
 export const register = (data: any) => api.post('register/', data);
 export const getStocks = (q?: string) => api.get('stock/', { params: { q } });
@@ -32,5 +48,25 @@ export const addToWatchlist = (data: { ts_code: string; name: string; group_id?:
 export const removeFromWatchlist = (ts_code: string, group_id?: string) => api.delete(`watchlist/`, { params: { ts_code, group_id } });
 
 export const analyzeWatchlist = (group_id?: string) => api.post('ai/analyze/', { group_id });
+export const chatAI = (data: { messages: Array<{ role: string; content: string }>; stock?: any }) => api.post('ai/chat/', data);
+
+export const getEvents = (params: { symbol: string; start?: string; end?: string }) =>
+  api.get('events/', { params });
+
+export const getSignals = (params: { symbol: string }) => api.get('signals/', { params });
+
+export const runBacktest = (data: {
+  symbol: string;
+  template: string;
+  params: Record<string, any>;
+  start_date?: string;
+  end_date?: string;
+  oos_start_date?: string;
+  initial_cash?: number;
+  commission_rate?: number;
+  stamp_duty_rate?: number;
+  slippage_bps?: number;
+  lot_size?: number;
+}) => api.post('backtest/', data);
 
 export default api;

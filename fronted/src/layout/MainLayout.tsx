@@ -1,10 +1,10 @@
 import { Layout, Menu, Button, Drawer, theme, Grid, Dropdown, Avatar } from 'antd';
 import { 
-  MenuOutlined, DashboardOutlined, StockOutlined, 
+  MenuOutlined, DashboardOutlined, 
   ThunderboltOutlined, SettingOutlined, MessageOutlined,
-  SunOutlined, MoonOutlined, LogoutOutlined, UserOutlined
+  SunOutlined, MoonOutlined, LogoutOutlined, UserOutlined, StarOutlined, ExperimentOutlined
 } from '@ant-design/icons';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { AIChat } from '../components/AIChat';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -18,16 +18,47 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const isMobile = !screens.md; // < 768px
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
-  const [aiOpen, setAiOpen] = useState(false);
-  const [pcAiCollapsed, setPcAiCollapsed] = useState(true); // Default to collapsed (closed)
-  const { isDark, toggleTheme, logout, username } = useStore();
+  const { isDark, toggleTheme, logout, username, isAiChatOpen, setAiChatOpen } = useStore();
   const { token } = theme.useToken();
   const navigate = useNavigate();
   const location = useLocation();
+  const [aiWidth, setAiWidth] = useState<number>(() => {
+    const raw = window.localStorage.getItem('aiChatWidth');
+    const v = raw ? Number(raw) : 360;
+    return Number.isFinite(v) ? Math.min(Math.max(v, 280), 720) : 360;
+  });
+  const [isResizingAI, setIsResizingAI] = useState(false);
+
+  const buttonRight = useMemo(() => {
+    return !isMobile && isAiChatOpen ? aiWidth + 16 : 16;
+  }, [aiWidth, isAiChatOpen, isMobile]);
+
+  useEffect(() => {
+    window.localStorage.setItem('aiChatWidth', String(aiWidth));
+  }, [aiWidth]);
+
+  useEffect(() => {
+    if (!isResizingAI) return;
+    const onMove = (e: MouseEvent) => {
+      const target = window.innerWidth - e.clientX;
+      const next = Math.min(Math.max(target, 280), 720);
+      setAiWidth(next);
+    };
+    const onUp = () => {
+      setIsResizingAI(false);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [isResizingAI]);
 
   const MenuItems = [
     { key: '/', icon: <DashboardOutlined />, label: '市场概览' },
-    { key: '/stocks', icon: <StockOutlined />, label: '股票数据' },
+    { key: '/watchlist', icon: <StarOutlined />, label: '自选&分组' },
+    { key: '/strategy', icon: <ExperimentOutlined />, label: '策略实验室' },
     { key: '/analysis', icon: <ThunderboltOutlined />, label: '技术分析' },
     { key: '/settings', icon: <SettingOutlined />, label: '设置' },
   ];
@@ -92,7 +123,7 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
           </Dropdown>
 
           {isMobile && (
-            <Button shape="circle" icon={<MessageOutlined />} onClick={() => setAiOpen(true)} type="primary" ghost />
+            <Button shape="circle" icon={<MessageOutlined />} onClick={() => setAiChatOpen(true)} type="primary" ghost />
           )}
         </div>
       </Header>
@@ -131,10 +162,10 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
         {/* PC Right Sider (AI) */}
         {!isMobile && (
           <Sider 
-            width={320} 
+            width={aiWidth} 
             collapsible 
-            collapsed={pcAiCollapsed} 
-            onCollapse={setPcAiCollapsed}
+            collapsed={!isAiChatOpen} 
+            onCollapse={(val) => setAiChatOpen(!val)}
             collapsedWidth={0}
             theme={isDark ? 'dark' : 'light'}
             style={{ 
@@ -142,10 +173,27 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
               height: 'calc(100vh - 64px)',
               position: 'sticky',
               top: 64,
+              overflow: 'hidden',
             }}
             trigger={null}
           >
-             <div style={{ height: '100%', display: pcAiCollapsed ? 'none' : 'block' }}>
+             <div
+               onMouseDown={(e) => {
+                 if (!isAiChatOpen) return;
+                 e.preventDefault();
+                 setIsResizingAI(true);
+               }}
+               style={{
+                 position: 'absolute',
+                 left: 0,
+                 top: 0,
+                 bottom: 0,
+                 width: 6,
+                 cursor: 'col-resize',
+                 zIndex: 10,
+               }}
+             />
+             <div style={{ height: '100%', display: !isAiChatOpen ? 'none' : 'block' }}>
                <AIChat open={true} onClose={() => {}} isMobile={false} />
              </div>
           </Sider>
@@ -153,8 +201,8 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
         {!isMobile && (
            <Button 
              icon={<MessageOutlined />} 
-             style={{ position: 'fixed', right: pcAiCollapsed ? 16 : 336, bottom: 16, zIndex: 100, transition: 'right 0.2s' }}
-             onClick={() => setPcAiCollapsed(!pcAiCollapsed)}
+             style={{ position: 'fixed', right: buttonRight, bottom: 16, zIndex: 100, transition: 'right 0.2s' }}
+             onClick={() => setAiChatOpen(!isAiChatOpen)}
              shape="circle"
              type="primary"
              size="large"
@@ -172,9 +220,11 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
         />
       </Drawer>
 
-      <Drawer title="AI 助手" placement="right" onClose={() => setAiOpen(false)} open={aiOpen} width="100%">
-        <AIChat open={aiOpen} onClose={() => setAiOpen(false)} isMobile={true} />
-      </Drawer>
+      {isMobile && (
+        <Drawer title="AI 助手" placement="right" onClose={() => setAiChatOpen(false)} open={isAiChatOpen} width="100%">
+          <AIChat open={isAiChatOpen} onClose={() => setAiChatOpen(false)} isMobile={true} />
+        </Drawer>
+      )}
     </Layout>
   );
 };

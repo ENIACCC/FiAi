@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { MainLayout } from '../layout/MainLayout';
 import { StockChart } from '../components/StockChart';
 import { useStore } from '../store/useStore';
-import { Card, Row, Col, Statistic, Spin, Segmented } from 'antd';
+import { Card, Row, Col, Statistic, Spin, Segmented, App } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import * as api from '../api';
 
 export const Dashboard = () => {
   const { isDark } = useStore();
+  const { message } = App.useApp();
   const [indices, setIndices] = useState<any[]>([]);
   const [loadingIndices, setLoadingIndices] = useState(false);
   const [topGainers, setTopGainers] = useState<any[]>([]);
@@ -25,7 +26,7 @@ export const Dashboard = () => {
           setIndices(res.data.data);
         }
       } catch (error) {
-        console.error(error);
+        message.error('加载市场指数失败');
       } finally {
         setLoadingIndices(false);
       }
@@ -39,7 +40,7 @@ export const Dashboard = () => {
           setTopGainers(res.data.data);
         }
       } catch (error) {
-        console.error(error);
+        message.error('加载涨幅榜失败');
       } finally {
         setLoadingGainers(false);
       }
@@ -53,7 +54,7 @@ export const Dashboard = () => {
           setTopIndustries(res.data.data);
         }
       } catch (error) {
-        console.error(error);
+        message.error('加载板块数据失败');
       } finally {
         setLoadingIndustries(false);
       }

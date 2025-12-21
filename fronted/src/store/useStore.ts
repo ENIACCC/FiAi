@@ -14,11 +14,19 @@ interface AppState {
   username: string | null;
   setAuth: (token: string, refreshToken: string, username: string) => void;
   logout: () => void;
+  isAiChatOpen: boolean;
+  setAiChatOpen: (isOpen: boolean) => void;
+  aiContext: { type: 'stock' | 'general'; data?: any; message?: string } | null;
+  setAiContext: (context: { type: 'stock' | 'general'; data?: any; message?: string } | null) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
   isDark: false,
   toggleTheme: () => set((state) => ({ isDark: !state.isDark })),
+  isAiChatOpen: false,
+  setAiChatOpen: (isOpen) => set({ isAiChatOpen: isOpen }),
+  aiContext: null,
+  setAiContext: (context) => set({ aiContext: context }),
   watchlist: new Set(),
   addToWatchlist: (code) => set((state) => {
     const newSet = new Set(state.watchlist);

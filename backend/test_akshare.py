@@ -21,16 +21,16 @@ def test_hist(symbol):
     except Exception as e:
         print(f"Error: {e}")
 
-print("--- Testing ETF 516650 ---")
-test_bid_ask('516650')
-# ETFs might use fund_etf_hist_em
-try:
-    print("ETF Hist:")
-    df = ak.fund_etf_hist_em(symbol='516650', period='daily', start_date='20240101', adjust='qfq')
-    print(df.tail(1))
-except Exception as e:
-    print(f"ETF Hist Error: {e}")
+if __name__ == "__main__":
+    print("--- Testing ETF 516650 ---")
+    test_bid_ask("516650")
+    try:
+        print("ETF Hist:")
+        df = ak.fund_etf_hist_em(symbol="516650", period="daily", start_date="20240101", adjust="qfq")
+        print(df.tail(1))
+    except Exception as e:
+        print(f"ETF Hist Error: {e}")
 
-print("\n--- Testing Stock 600519 ---")
-test_bid_ask('600519')
-test_hist('600519')
+    print("\n--- Testing Stock 600519 ---")
+    test_bid_ask("600519")
+    test_hist("600519")

@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+import os
+from urllib.parse import urlparse
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,12 +23,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-xf&mf)#q_xpozkd&7+i-=$@9i-aa-@yz4u7=l_mw5jz^m&x^=o"
+SECRET_KEY = os.getenv(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-xf&mf)#q_xpozkd&7+i-=$@9i-aa-@yz4u7=l_mw5jz^m&x^=o",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 
 
 # Application definition
@@ -78,28 +83,48 @@ TEMPLATES = [
 WSGI_APPLICATION = "finance_project.wsgi.application"
 
 
-# Database
-# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
+def _database_config():
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        parsed = urlparse(database_url)
+        if parsed.scheme not in {"postgres", "postgresql"}:
+            raise ValueError("Only postgres DATABASE_URL is supported in this project.")
+        cfg = {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": (parsed.path or "").lstrip("/") or "postgres",
+            "USER": parsed.username or "",
+            "HOST": parsed.hostname or "",
+            "PORT": str(parsed.port or 5432),
+        }
+        if parsed.password:
+            cfg["PASSWORD"] = parsed.password
+        return cfg
 
-# Use SQLite for development/demo (PostgreSQL config below)
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.sqlite3",
-#         "NAME": BASE_DIR / "db_new.sqlite3",
-#     }
-# }
-
-# PostgreSQL Configuration (Uncomment to use)
-DATABASES = {
-    "default": {
+    password = (
+        os.getenv("FIAI_DB_PASSWORD")
+        or os.getenv("PGPASSWORD")
+        or os.getenv("POSTGRES_PASSWORD")
+        or os.getenv("PG_PASS")
+    )
+    force_postgres = str(os.getenv("FIAI_FORCE_POSTGRES", "")).lower() in {"1", "true", "yes"}
+    if DEBUG and not force_postgres and not password:
+        return {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db_new.sqlite3",
+        }
+    cfg = {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "fi_ai",
-        "USER": "postgres",
-        "PASSWORD": "jlwgmy824125",
-        "HOST": "localhost",
-        "PORT": "5432",
+        "NAME": os.getenv("FIAI_DB_NAME", "fi_ai"),
+        "USER": os.getenv("FIAI_DB_USER", "postgres"),
+        "HOST": os.getenv("FIAI_DB_HOST", "localhost"),
+        "PORT": os.getenv("FIAI_DB_PORT", "5432"),
     }
-}# }
+    if password:
+        cfg["PASSWORD"] = password
+    return cfg
+
+
+DATABASES = {"default": _database_config()}
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

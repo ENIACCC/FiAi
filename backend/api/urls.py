@@ -5,10 +5,11 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 from .views import (
-    StockDataView, WatchlistView, AIAnalyzeView, RegisterView, 
+    StockDataView, WatchlistView, AIAnalyzeView, AIChatView, RegisterView, 
     MarketIndexView, TopGainersView, AIAnalysisLogViewSet,
     UserInfoView, ChangePasswordView, TopIndustriesView, WatchlistGroupViewSet,
-    WatchlistCountView
+    WatchlistCountView, EventView, SignalExplainView, BacktestView,
+    AIModelConfigsView, AIModelConfigDetailView, AIModelConfigSelectView
 )
 
 router = DefaultRouter()
@@ -23,10 +24,17 @@ urlpatterns = [
     path('watchlist/', WatchlistView.as_view(), name='watchlist'),
     path('watchlist/count/', WatchlistCountView.as_view(), name='watchlist_count'),
     path('ai/analyze/', AIAnalyzeView.as_view(), name='ai_analyze'),
+    path('ai/chat/', AIChatView.as_view(), name='ai_chat'),
     path('market/index/', MarketIndexView.as_view(), name='market_index'),
     path('market/top-gainers/', TopGainersView.as_view(), name='top_gainers'),
     path('market/top-industries/', TopIndustriesView.as_view(), name='top_industries'),
     path('user/info/', UserInfoView.as_view(), name='user_info'),
     path('user/change-password/', ChangePasswordView.as_view(), name='change_password'),
+    path('ai-models/', AIModelConfigsView.as_view(), name='ai_models'),
+    path('ai-models/<uuid:cfg_id>/', AIModelConfigDetailView.as_view(), name='ai_model_detail'),
+    path('ai-models/<uuid:cfg_id>/select/', AIModelConfigSelectView.as_view(), name='ai_model_select'),
+    path('events/', EventView.as_view(), name='events'),
+    path('signals/', SignalExplainView.as_view(), name='signals'),
+    path('backtest/', BacktestView.as_view(), name='backtest'),
     path('', include(router.urls)),
 ]

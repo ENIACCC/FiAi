@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { MainLayout } from '../layout/MainLayout';
 import { StockList } from '../components/StockList';
 import { Card, Tabs, Button, Modal, Input, App, Form, Space, Dropdown } from 'antd';
-import { PlusOutlined, EditOutlined, SettingOutlined } from '@ant-design/icons';
+import { PlusOutlined, SettingOutlined } from '@ant-design/icons';
 import * as api from '../api';
 import { useStore } from '../store/useStore';
 
@@ -56,7 +56,7 @@ export const StockPage = () => {
           setActiveGroupId('default');
       }
     } catch (error) {
-      console.error(error);
+      message.error('加载分组失败');
     }
   };
 
@@ -75,7 +75,7 @@ export const StockPage = () => {
         setWatchlist(codes);
       }
     } catch (error) {
-      console.error(error);
+      message.error('加载自选失败');
     } finally {
       setLoadingWatchlist(false);
     }
@@ -95,21 +95,6 @@ export const StockPage = () => {
   }, []);
 
   useEffect(() => {
-    // Fast path: if selected group has zero items, do not call backend heavy fetch
-    if (activeGroupId === 'default') {
-      if (defaultCount === 0) {
-        setWatchlistData([]);
-        setLoadingWatchlist(false);
-        return;
-      }
-    } else {
-      const cnt = groupCounts[activeGroupId] || 0;
-      if (cnt === 0) {
-        setWatchlistData([]);
-        setLoadingWatchlist(false);
-        return;
-      }
-    }
     fetchWatchlist();
   }, [activeGroupId]);
   
@@ -216,7 +201,7 @@ export const StockPage = () => {
         setSearchResults(res.data.data);
       }
     } catch (error) {
-      console.error(error);
+      message.error('搜索失败');
     } finally {
       setLoadingSearch(false);
     }
@@ -272,12 +257,12 @@ export const StockPage = () => {
   // Tabs Items
   const items = [
     { 
-      label: (<span>{defaultGroupName}</span>), 
+      label: (<span>{defaultGroupName} ({defaultCount})</span>), 
       key: 'default', 
       closable: false 
     },
     ...groups.map(g => ({
-      label: (<span>{g.name}</span>),
+      label: (<span>{g.name} ({groupCounts[g.id] || 0})</span>),
       key: g.id,
       closable: true
     }))

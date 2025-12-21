@@ -6,8 +6,11 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
 import { StockPage } from './pages/StockPage';
+import { StockResearch } from './pages/StockResearch';
 import { AnalysisHistory } from './pages/AnalysisHistory';
 import { Settings } from './pages/Settings';
+import { StrategyLab } from './pages/StrategyLab';
+import { BacktestReport } from './pages/BacktestReport';
 
 const AuthGuard = ({ children }: { children: JSX.Element }) => {
   const token = useStore((state) => state.token);
@@ -45,10 +48,30 @@ function App() {
                 <StockPage />
               </AuthGuard>
             } />
+            <Route path="/stocks/:ts_code" element={
+              <AuthGuard>
+                <StockResearch />
+              </AuthGuard>
+            } />
+            <Route path="/watchlist" element={
+              <AuthGuard>
+                <StockPage />
+              </AuthGuard>
+            } />
             {/* Placeholders for other routes */}
             <Route path="/analysis" element={
               <AuthGuard>
                 <AnalysisHistory />
+              </AuthGuard>
+            } />
+            <Route path="/strategy" element={
+              <AuthGuard>
+                <StrategyLab />
+              </AuthGuard>
+            } />
+            <Route path="/backtest-report" element={
+              <AuthGuard>
+                <BacktestReport />
               </AuthGuard>
             } />
              <Route path="/settings" element={
